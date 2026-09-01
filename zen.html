@@ -1,0 +1,831 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Zen · Scroll of Ways</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com" />
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin />
+    <link href="https://fonts.googleapis.com/css2?family=Cinzel:wght@400;700;900&family=Kiwi+Maru&display=swap" rel="stylesheet" />
+    <style>
+        * {
+            margin: 0;
+            padding: 0;
+            box-sizing: border-box;
+            user-select: none;
+        }
+
+        body {
+            min-height: 100vh;
+            background: #0b0b12;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-family: 'Cinzel', 'Kiwi Maru', serif;
+            overflow: hidden;
+        }
+
+        #gameWrapper {
+            position: fixed;
+            inset: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            background: #0b0b12;
+        }
+
+        #gameCanvas {
+            width: 100%;
+            height: 100%;
+            display: block;
+            touch-action: none;
+            cursor: none;
+        }
+
+        /* ── HUD ── */
+        #hud {
+            position: fixed;
+            top: 0;
+            left: 0;
+            right: 0;
+            padding: 16px 28px;
+            display: flex;
+            justify-content: space-between;
+            align-items: center;
+            background: linear-gradient(180deg, rgba(0, 0, 0, 0.75) 0%, transparent 100%);
+            z-index: 50;
+            pointer-events: none;
+            font-family: 'Cinzel', serif;
+            flex-wrap: wrap;
+            gap: 8px 16px;
+        }
+
+        #hud>div {
+            display: flex;
+            align-items: center;
+            gap: 8px;
+            font-size: 1.2rem;
+            color: #f5e6c8;
+            text-shadow: 0 0 20px rgba(0, 0, 0, 0.9), 0 2px 4px rgba(0, 0, 0, 0.8);
+            letter-spacing: 1px;
+        }
+
+        #hud .label {
+            font-size: 0.7rem;
+            opacity: 0.6;
+            letter-spacing: 3px;
+            font-weight: 400;
+        }
+
+        #hud .value {
+            font-weight: 900;
+            font-size: 1.6rem;
+            min-width: 2.4rem;
+            text-align: center;
+        }
+
+        #hud .timer-value {
+            color: #7ecfff;
+            font-size: 2rem;
+            min-width: 3.6rem;
+            text-align: center;
+            font-weight: 900;
+            text-shadow: 0 0 30px rgba(126, 207, 255, 0.4), 0 0 60px rgba(126, 207, 255, 0.15);
+        }
+
+        #hud .timer-value.warning {
+            color: #ff7e7e;
+            text-shadow: 0 0 30px rgba(255, 100, 100, 0.5), 0 0 60px rgba(255, 100, 100, 0.2);
+            animation: pulse 0.8s ease-in-out infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% {
+                transform: scale(1);
+            }
+            100% {
+                transform: scale(1.06);
+            }
+        }
+
+        #hud .score-value {
+            color: #ffd93d;
+            text-shadow: 0 0 30px rgba(255, 217, 61, 0.3);
+        }
+
+        #hud .miss-value {
+            color: #ffb6c1;
+            font-size: 0.9rem;
+        }
+
+        /* ── Game Over Overlay ── */
+        #gameOverlay {
+            position: fixed;
+            inset: 0;
+            z-index: 100;
+            background: rgba(0, 0, 0, 0.7);
+            backdrop-filter: blur(8px);
+            display: flex;
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.6s ease;
+            padding: 20px;
+        }
+
+        #gameOverlay.active {
+            opacity: 1;
+            pointer-events: auto;
+        }
+
+        #gameOverlay .overlay-card {
+            background: rgba(30, 20, 40, 0.9);
+            border: 2px solid #d4b68a;
+            border-radius: 40px;
+            padding: 40px 50px 35px;
+            max-width: 460px;
+            width: 100%;
+            text-align: center;
+            box-shadow: 0 40px 80px rgba(0, 0, 0, 0.8), 0 0 0 4px #2d1f14;
+            transform: scale(0.9);
+            transition: transform 0.5s cubic-bezier(0.34, 1.56, 0.64, 1);
+        }
+
+        #gameOverlay.active .overlay-card {
+            transform: scale(1);
+        }
+
+        #gameOverlay h2 {
+            font-family: 'Cinzel', serif;
+            font-weight: 900;
+            font-size: 2.2rem;
+            color: #f5e6c8;
+            text-shadow: 0 4px 0 #2d1f14;
+            margin-bottom: 6px;
+        }
+
+        #gameOverlay .sub {
+            font-family: 'Kiwi Maru', serif;
+            font-size: 0.9rem;
+            color: #b8a58a;
+            margin-bottom: 16px;
+            letter-spacing: 2px;
+        }
+
+        #gameOverlay .final-score {
+            font-family: 'Cinzel', serif;
+            font-size: 2.6rem;
+            font-weight: 900;
+            color: #ffd93d;
+            text-shadow: 0 0 40px rgba(255, 217, 61, 0.3);
+            margin: 10px 0 20px;
+        }
+
+        #gameOverlay .btn-group {
+            display: flex;
+            flex-wrap: wrap;
+            gap: 12px;
+            justify-content: center;
+            margin-top: 8px;
+        }
+
+        #gameOverlay .btn {
+            font-family: 'Cinzel', serif;
+            font-weight: 700;
+            font-size: 0.85rem;
+            letter-spacing: 2px;
+            padding: 12px 28px;
+            border-radius: 40px;
+            border: none;
+            cursor: pointer;
+            transition: all 0.2s ease;
+            text-decoration: none;
+            color: #faf3e6;
+            background: linear-gradient(145deg, #1a6b8a, #0f4c5c);
+            box-shadow: 0 4px 0 rgba(0, 0, 0, 0.3);
+            flex: 1 1 auto;
+            min-width: 120px;
+        }
+
+        #gameOverlay .btn:hover {
+            transform: scale(1.03);
+        }
+
+        #gameOverlay .btn:active {
+            transform: translateY(3px);
+            box-shadow: 0 1px 0 rgba(0, 0, 0, 0.3);
+        }
+
+        #gameOverlay .btn-primary {
+            background: linear-gradient(145deg, #7ecfff, #1a6b8a);
+            border-bottom: 3px solid #bdc3c7;
+        }
+
+        #gameOverlay .btn-secondary {
+            background: linear-gradient(145deg, #6b4c2a, #3d2b1a);
+            border-bottom: 3px solid #d4b68a;
+        }
+
+        #gameOverlay .btn-home {
+            background: linear-gradient(145deg, #8b653f, #4d3522);
+            border-bottom: 3px solid #c9a87c;
+        }
+
+        /* ── Responsive ── */
+        @media (max-width: 600px) {
+            #hud {
+                padding: 10px 14px;
+                gap: 4px 10px;
+            }
+            #hud>div {
+                font-size: 0.9rem;
+            }
+            #hud .value {
+                font-size: 1.2rem;
+                min-width: 1.8rem;
+            }
+            #hud .timer-value {
+                font-size: 1.4rem;
+                min-width: 2.6rem;
+            }
+            #hud .label {
+                font-size: 0.55rem;
+            }
+            #gameOverlay .overlay-card {
+                padding: 28px 20px 24px;
+                border-radius: 28px;
+            }
+            #gameOverlay h2 {
+                font-size: 1.6rem;
+            }
+            #gameOverlay .final-score {
+                font-size: 2rem;
+            }
+            #gameOverlay .btn {
+                font-size: 0.7rem;
+                padding: 10px 18px;
+                min-width: 80px;
+            }
+        }
+
+        @media (max-width: 400px) {
+            #hud {
+                padding: 6px 10px;
+            }
+            #hud>div {
+                font-size: 0.7rem;
+                gap: 4px;
+            }
+            #hud .value {
+                font-size: 1rem;
+                min-width: 1.4rem;
+            }
+            #hud .timer-value {
+                font-size: 1.1rem;
+                min-width: 2rem;
+            }
+            #hud .label {
+                font-size: 0.45rem;
+            }
+        }
+    </style>
+</head>
+<body>
+
+    <!-- Game Wrapper -->
+    <div id="gameWrapper">
+        <canvas id="gameCanvas"></canvas>
+    </div>
+
+    <!-- HUD -->
+    <div id="hud">
+        <div>
+            <span class="label">⏱ TIME</span>
+            <span class="timer-value" id="timerDisplay">60</span>
+        </div>
+        <div>
+            <span class="label">🍉 SCORE</span>
+            <span class="value score-value" id="scoreDisplay">0</span>
+        </div>
+        <div>
+            <span class="label">🌊 PEACE</span>
+            <span class="miss-value" id="peaceDisplay">☯️</span>
+        </div>
+    </div>
+
+    <!-- Game Over Overlay -->
+    <div id="gameOverlay">
+        <div class="overlay-card">
+            <h2>🧘 Stillness</h2>
+            <div class="sub">— The River Returns to Source —</div>
+            <div class="final-score" id="finalScore">Score: 0</div>
+            <div class="btn-group">
+                <button class="btn btn-primary" id="tryAgainBtn">🔄 Again</button>
+                <a href="levels.html" class="btn btn-home">🏮 Ways</a>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        (function() {
+            // ─── Canvas Setup ──────────────────────────────────────────────────
+            const canvas = document.getElementById('gameCanvas');
+            const ctx = canvas.getContext('2d');
+            const wrapper = document.getElementById('gameWrapper');
+
+            function resizeCanvas() {
+                const rect = wrapper.getBoundingClientRect();
+                canvas.width = rect.width;
+                canvas.height = rect.height;
+            }
+            resizeCanvas();
+            window.addEventListener('resize', resizeCanvas);
+
+            const W = () => canvas.width;
+            const H = () => canvas.height;
+
+            // ─── DOM refs ──────────────────────────────────────────────────────
+            const timerDisplay = document.getElementById('timerDisplay');
+            const scoreDisplay = document.getElementById('scoreDisplay');
+            const peaceDisplay = document.getElementById('peaceDisplay');
+            const gameOverlay = document.getElementById('gameOverlay');
+            const finalScore = document.getElementById('finalScore');
+            const tryAgainBtn = document.getElementById('tryAgainBtn');
+
+            // ─── Game State ────────────────────────────────────────────────────
+            let score = 0;
+            let timeLeft = 60; // seconds
+            const MAX_TIME = 60;
+            let gameActive = true;
+            let fruits = [];
+            let particles = [];
+            let slashEffects = [];
+            let swordTrail = [];
+            let spawnTimer = 0;
+            let spawnInterval = 0.9;
+
+            // ─── Utils ──────────────────────────────────────────────────────────
+            function random(min, max) { return Math.random() * (max - min) + min; }
+
+            function randomInt(min, max) { return Math.floor(random(min, max + 1)); }
+
+            // ─── Fruit Factory (NO BOMBS) ─────────────────────────────────────
+            const fruitEmojis = ['🍎', '🍊', '🍉', '🍇', '🍌', '🍑', '🍒', '🍓', '🥝', '🍋', '🍐', '🍈'];
+
+            class GameObject {
+                constructor(x, y, vx, vy, radius, emoji) {
+                    this.x = x;
+                    this.y = y;
+                    this.vx = vx;
+                    this.vy = vy;
+                    this.radius = radius;
+                    this.emoji = emoji;
+                    this.sliced = false;
+                    this.missed = false;
+                    this.rotation = random(0, Math.PI * 2);
+                    this.rotSpeed = random(-0.05, 0.05);
+                    this.scale = 1;
+                }
+
+                update() {
+                    this.x += this.vx;
+                    this.y += this.vy;
+                    this.vy += 0.12;
+                    this.rotation += this.rotSpeed;
+                }
+
+                draw(ctx) {
+                    ctx.save();
+                    ctx.translate(this.x, this.y);
+                    ctx.rotate(this.rotation);
+
+                    const size = this.radius * 1.9;
+
+                    const grad = ctx.createRadialGradient(0, 0, 0, 0, 0, this.radius * 1.6);
+                    grad.addColorStop(0, 'rgba(255, 240, 120, 0.7)');
+                    grad.addColorStop(0.5, 'rgba(255, 200, 60, 0.3)');
+                    grad.addColorStop(1, 'rgba(255, 200, 50, 0)');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(0, 0, this.radius * 1.6, 0, Math.PI * 2);
+                    ctx.fill();
+
+                    ctx.shadowColor = 'rgba(255, 235, 150, 0.95)';
+                    ctx.shadowBlur = 35;
+                    ctx.font = `${size}px "Segoe UI Emoji", "Apple Color Emoji", "Noto Color Emoji", sans-serif`;
+                    ctx.textAlign = 'center';
+                    ctx.textBaseline = 'middle';
+                    ctx.fillText(this.emoji, 0, 0);
+
+                    ctx.restore();
+                }
+
+                isOffScreen() {
+                    return this.y > H() + this.radius + 30;
+                }
+            }
+
+            // ─── Particles ──────────────────────────────────────────────────────
+            class Particle {
+                constructor(x, y, color, count = 18) {
+                    this.parts = [];
+                    for (let i = 0; i < count; i++) {
+                        const angle = random(0, Math.PI * 2);
+                        const speed = random(2, 10);
+                        this.parts.push({
+                            x: x,
+                            y: y,
+                            vx: Math.cos(angle) * speed,
+                            vy: Math.sin(angle) * speed - 2,
+                            radius: random(3, 10),
+                            color: color,
+                            life: 1.0,
+                            decay: random(0.01, 0.025),
+                        });
+                    }
+                }
+
+                update() {
+                    for (const p of this.parts) {
+                        p.x += p.vx;
+                        p.y += p.vy;
+                        p.vy += 0.12;
+                        p.life -= p.decay;
+                        p.radius *= 0.98;
+                    }
+                    this.parts = this.parts.filter(p => p.life > 0 && p.radius > 0.5);
+                }
+
+                draw(ctx) {
+                    for (const p of this.parts) {
+                        ctx.globalAlpha = p.life;
+                        ctx.fillStyle = p.color;
+                        ctx.shadowBlur = 25;
+                        ctx.shadowColor = p.color;
+                        ctx.beginPath();
+                        ctx.arc(p.x, p.y, Math.max(p.radius, 1), 0, Math.PI * 2);
+                        ctx.fill();
+                    }
+                    ctx.globalAlpha = 1;
+                    ctx.shadowBlur = 0;
+                }
+
+                isDead() { return this.parts.length === 0; }
+            }
+
+            // ─── Slash Effect ──────────────────────────────────────────────────
+            class SlashEffect {
+                constructor(x, y, color = '#7ecfff') {
+                    this.x = x;
+                    this.y = y;
+                    this.life = 0.6;
+                    this.maxLife = 0.6;
+                    this.radius = 40;
+                    this.color = color;
+                }
+
+                update() {
+                    this.life -= 0.02;
+                    this.radius += 2;
+                }
+
+                draw(ctx) {
+                    const alpha = this.life / this.maxLife;
+                    ctx.save();
+                    ctx.globalAlpha = alpha * 0.7;
+                    const grad = ctx.createRadialGradient(this.x, this.y, 0, this.x, this.y, this.radius);
+                    grad.addColorStop(0, this.color);
+                    grad.addColorStop(0.4, this.color + '80');
+                    grad.addColorStop(1, 'transparent');
+                    ctx.fillStyle = grad;
+                    ctx.beginPath();
+                    ctx.arc(this.x, this.y, this.radius, 0, Math.PI * 2);
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                isDead() { return this.life <= 0; }
+            }
+
+            // ─── Spawning (Fruits Only) ──────────────────────────────────────
+            function spawnObject() {
+                if (!gameActive) return;
+                const emoji = fruitEmojis[randomInt(0, fruitEmojis.length - 1)];
+                const radius = 26 + random(0, 8);
+                const x = random(radius + 30, W() - radius - 30);
+                const y = H() - 30 - radius;
+                const vx = random(-3.5, 3.5);
+                const vy = random(-14, -8);
+                const obj = new GameObject(x, y, vx, vy, radius, emoji);
+                fruits.push(obj);
+            }
+
+            // ─── Sword Trail ────────────────────────────────────────────────────
+            function addSwordTrail(x, y) {
+                swordTrail.push({ x, y, life: 0.7 });
+                if (swordTrail.length > 35) swordTrail.shift();
+            }
+
+            function updateSwordTrail() {
+                for (const t of swordTrail) t.life -= 0.025;
+                swordTrail = swordTrail.filter(t => t.life > 0);
+            }
+
+            function drawSwordTrail(ctx) {
+                if (swordTrail.length < 2) return;
+                ctx.save();
+                for (let i = 1; i < swordTrail.length; i++) {
+                    const p1 = swordTrail[i - 1];
+                    const p2 = swordTrail[i];
+                    const alpha = p2.life * 0.85;
+                    const width = p2.life * 10 + 3;
+
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = `rgba(180, 230, 255, ${alpha})`;
+                    ctx.lineWidth = width;
+                    ctx.shadowColor = `rgba(126, 207, 255, ${alpha * 0.6})`;
+                    ctx.shadowBlur = 30;
+                    ctx.stroke();
+
+                    ctx.beginPath();
+                    ctx.moveTo(p1.x, p1.y);
+                    ctx.lineTo(p2.x, p2.y);
+                    ctx.strokeStyle = `rgba(220, 240, 255, ${alpha * 0.4})`;
+                    ctx.lineWidth = width * 0.25;
+                    ctx.shadowBlur = 50;
+                    ctx.stroke();
+                }
+                ctx.restore();
+            }
+
+            // ─── Slice Detection ──────────────────────────────────────────────
+            function checkSlice(x1, y1, x2, y2) {
+                if (!gameActive) return;
+                const swipeRadius = 55;
+
+                for (const fruit of fruits) {
+                    if (fruit.sliced) continue;
+                    const d = distanceToSegment(fruit.x, fruit.y, x1, y1, x2, y2);
+
+                    if (d < fruit.radius + swipeRadius) {
+                        fruit.sliced = true;
+                        const colors = ['#7ecfff', '#6bcb77', '#ffd93d', '#ff9ff3', '#ff6b6b'];
+                        const color = colors[randomInt(0, colors.length - 1)];
+                        slashEffects.push(new SlashEffect(fruit.x, fruit.y, color));
+
+                        // Score +1 and add time
+                        score += 1;
+                        timeLeft = Math.min(timeLeft + 0.5, MAX_TIME);
+
+                        particles.push(new Particle(fruit.x, fruit.y, color, 12));
+                        updateHUD();
+                    }
+                }
+                fruits = fruits.filter(f => !f.sliced);
+            }
+
+            function distanceToSegment(px, py, x1, y1, x2, y2) {
+                const dx = x2 - x1,
+                    dy = y2 - y1;
+                const lenSq = dx * dx + dy * dy;
+                if (lenSq === 0) return Math.hypot(px - x1, py - y1);
+                let t = ((px - x1) * dx + (py - y1) * dy) / lenSq;
+                t = Math.max(0, Math.min(1, t));
+                const nearX = x1 + t * dx,
+                    nearY = y1 + t * dy;
+                return Math.hypot(px - nearX, py - nearY);
+            }
+
+            // ─── Input ──────────────────────────────────────────────────────────
+            let isPointerDown = false;
+            let lastX = 0,
+                lastY = 0;
+
+            function handleStart(x, y) {
+                isPointerDown = true;
+                lastX = x;
+                lastY = y;
+                addSwordTrail(x, y);
+            }
+
+            function handleMove(x, y) {
+                if (!isPointerDown) return;
+                addSwordTrail(x, y);
+                checkSlice(lastX, lastY, x, y);
+                lastX = x;
+                lastY = y;
+            }
+
+            function handleEnd() {
+                isPointerDown = false;
+                swordTrail = [];
+            }
+
+            canvas.addEventListener('mousedown', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                handleStart(e.clientX - rect.left, e.clientY - rect.top);
+            });
+            canvas.addEventListener('mousemove', (e) => {
+                const rect = canvas.getBoundingClientRect();
+                handleMove(e.clientX - rect.left, e.clientY - rect.top);
+            });
+            canvas.addEventListener('mouseup', handleEnd);
+            canvas.addEventListener('mouseleave', handleEnd);
+
+            canvas.addEventListener('touchstart', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                handleStart(touch.clientX - rect.left, touch.clientY - rect.top);
+            }, { passive: false });
+
+            canvas.addEventListener('touchmove', (e) => {
+                e.preventDefault();
+                const touch = e.touches[0];
+                const rect = canvas.getBoundingClientRect();
+                handleMove(touch.clientX - rect.left, touch.clientY - rect.top);
+            }, { passive: false });
+
+            canvas.addEventListener('touchend', (e) => {
+                e.preventDefault();
+                handleEnd();
+            }, { passive: false });
+
+            // ─── HUD ────────────────────────────────────────────────────────────
+            function updateHUD() {
+                const displayTime = Math.ceil(timeLeft);
+                timerDisplay.textContent = displayTime;
+                if (timeLeft <= 10) {
+                    timerDisplay.classList.add('warning');
+                } else {
+                    timerDisplay.classList.remove('warning');
+                }
+                scoreDisplay.textContent = score;
+                peaceDisplay.textContent = timeLeft > 10 ? '☯️' : '🌊';
+            }
+
+            // ─── Game Over ─────────────────────────────────────────────────────
+            function gameOver() {
+                gameActive = false;
+                finalScore.textContent = `🍉 ${score}`;
+                gameOverlay.classList.add('active');
+            }
+
+            // ─── Restart ──────────────────────────────────────────────────────
+            function restart() {
+                score = 0;
+                timeLeft = MAX_TIME;
+                gameActive = true;
+                fruits = [];
+                particles = [];
+                slashEffects = [];
+                swordTrail = [];
+                spawnTimer = 0;
+                spawnInterval = 0.9;
+                gameOverlay.classList.remove('active');
+                timerDisplay.classList.remove('warning');
+                updateHUD();
+            }
+
+            tryAgainBtn.addEventListener('click', restart);
+
+            // ─── Timer Tick ────────────────────────────────────────────────────
+            let lastTickTime = 0;
+
+            function tickTimer(delta) {
+                if (!gameActive) return;
+                timeLeft -= delta;
+                if (timeLeft <= 0) {
+                    timeLeft = 0;
+                    updateHUD();
+                    gameOver();
+                    return;
+                }
+                updateHUD();
+            }
+
+            // ─── Update Loop ──────────────────────────────────────────────────
+            let accumulator = 0;
+            const STEP = 1 / 60;
+
+            function update(delta) {
+                if (!gameActive) return;
+
+                // Timer
+                tickTimer(delta);
+
+                // Spawn
+                spawnTimer += delta;
+                if (spawnTimer > spawnInterval) {
+                    spawnTimer = 0;
+                    const count = Math.random() < 0.35 ? 2 : 1;
+                    for (let i = 0; i < count; i++) spawnObject();
+                    spawnInterval = Math.max(0.45, spawnInterval - 0.0015);
+                }
+
+                // Update fruits
+                for (const fruit of fruits) fruit.update();
+
+                // Miss handling: fruits that go off screen just disappear (no penalty in Zen)
+                fruits = fruits.filter(f => !f.isOffScreen() && !f.sliced);
+
+                // Update particles
+                for (const p of particles) p.update();
+                particles = particles.filter(p => !p.isDead());
+
+                // Update slash effects
+                for (const s of slashEffects) s.update();
+                slashEffects = slashEffects.filter(s => !s.isDead());
+
+                updateSwordTrail();
+            }
+
+            // ─── Draw Loop ────────────────────────────────────────────────────
+            function draw() {
+                const w = W(),
+                    h = H();
+                ctx.clearRect(0, 0, w, h);
+
+                // Background: calm, Zen gradient
+                const grad = ctx.createLinearGradient(0, 0, 0, h);
+                grad.addColorStop(0, '#0b1a2e');
+                grad.addColorStop(0.4, '#1a2a3e');
+                grad.addColorStop(0.7, '#2d1e36');
+                grad.addColorStop(1, '#1a0f1a');
+                ctx.fillStyle = grad;
+                ctx.fillRect(0, 0, w, h);
+
+                // Subtle water reflection
+                ctx.fillStyle = 'rgba(0, 40, 60, 0.15)';
+                ctx.fillRect(0, h * 0.88, w, h * 0.12);
+
+                // Draw fruits
+                for (const fruit of fruits) fruit.draw(ctx);
+
+                // Draw particles
+                for (const p of particles) p.draw(ctx);
+
+                // Draw slash effects
+                for (const s of slashEffects) s.draw(ctx);
+
+                // Draw sword trail
+                drawSwordTrail(ctx);
+
+                // Pointer
+                if (isPointerDown) {
+                    ctx.save();
+                    ctx.beginPath();
+                    ctx.arc(lastX, lastY, 10, 0, Math.PI * 2);
+                    ctx.strokeStyle = 'rgba(180, 230, 255, 0.3)';
+                    ctx.lineWidth = 2;
+                    ctx.stroke();
+                    ctx.beginPath();
+                    ctx.arc(lastX, lastY, 4, 0, Math.PI * 2);
+                    ctx.fillStyle = 'rgba(180, 230, 255, 0.5)';
+                    ctx.fill();
+                    ctx.restore();
+                }
+
+                // Zen message when time is low
+                if (timeLeft <= 5 && gameActive) {
+                    ctx.save();
+                    ctx.font = '1.2rem "Kiwi Maru", serif';
+                    ctx.fillStyle = 'rgba(255, 255, 255, 0.25)';
+                    ctx.textAlign = 'center';
+                    ctx.fillText('🌊 return to the source...', w / 2, h - 50);
+                    ctx.restore();
+                }
+            }
+
+            // ─── Game Loop ────────────────────────────────────────────────────
+            let lastTime = 0;
+
+            function gameLoop(timestamp) {
+                const delta = Math.min((timestamp - lastTime) / 1000, 0.05);
+                lastTime = timestamp;
+
+                update(delta);
+                draw();
+                requestAnimationFrame(gameLoop);
+            }
+
+            // ─── Init ──────────────────────────────────────────────────────────
+            updateHUD();
+            requestAnimationFrame((ts) => {
+                lastTime = ts;
+                gameLoop(ts);
+            });
+
+            window.addEventListener('resize', resizeCanvas);
+
+            // ─── Return to levels via home button ────────────────────────────
+            // The "Ways" button in overlay already links to levels.html
+        })();
+    </script>
+
+</body>
+</html>
