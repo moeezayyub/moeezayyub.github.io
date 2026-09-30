@@ -1,6 +1,6 @@
 {
-  "name": "Emoji Ninja",
-  "short_name": "Emoji Ninja",
+  "name": "Emoji Sort Puzzle",
+  "short_name": "Emoji Sort Puzzle",
   "start_url": "../index.html",
    "scope": "../",
   "display": "standalone",
