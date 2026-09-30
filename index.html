@@ -79,7 +79,87 @@
     0%,100%{ opacity:.72; transform:translate(-50%,-50%) scale(1); }
     50%    { opacity:1;   transform:translate(-50%,-50%) scale(1.06); }
   }
+/* ---------------- PWA Install Button ---------------- */
 
+#installBtn{
+  position:fixed;
+  left:50%;
+  bottom:calc(16px + env(safe-area-inset-bottom));
+  transform:translateX(-50%);
+  z-index:10;
+
+  min-height:48px;
+  padding:12px 22px;
+
+  display:inline-flex;
+  align-items:center;
+  justify-content:center;
+  gap:8px;
+
+  border-radius:16px;
+  border:1px solid rgba(255,255,255,.20);
+  background:linear-gradient(180deg, rgba(124,92,255,.95) 0%, rgba(90,55,214,.95) 100%);
+  -webkit-backdrop-filter:blur(14px) saturate(140%);
+  backdrop-filter:blur(14px) saturate(140%);
+
+  color:var(--ink);
+  font:inherit;
+  font-size:15px;
+  font-weight:650;
+  letter-spacing:.02em;
+  cursor:pointer;
+
+  box-shadow:
+    0 10px 26px rgba(94,58,214,.45),
+    0 2px 8px rgba(0,0,0,.35),
+    inset 0 1px 0 rgba(255,255,255,.28);
+
+  transition: transform .12s var(--ease),
+              box-shadow .22s ease,
+              opacity .22s ease;
+
+  touch-action:manipulation;
+  -webkit-tap-highlight-color:transparent;
+
+  animation: installRise .4s var(--ease) .5s backwards;
+}
+
+#installBtn[hidden]{ display:none; }
+
+#installBtn::before{
+  content:"⬇";
+  font-size:15px;
+  line-height:1;
+  transform:translateY(-1px);
+}
+
+#installBtn:active{
+  transform:translateX(-50%) scale(.96);
+  box-shadow:0 4px 14px rgba(0,0,0,.30);
+}
+
+#installBtn:focus-visible{
+  outline:2px solid rgba(170,142,255,.95);
+  outline-offset:3px;
+}
+
+@media (hover:hover) and (pointer:fine){
+  #installBtn:hover{
+    transform:translateX(-50%) translateY(-1px);
+  }
+  #installBtn:active{
+    transform:translateX(-50%) scale(.96);
+  }
+}
+
+@keyframes installRise{
+  from{ opacity:0; transform:translateX(-50%) translateY(14px) scale(.98); }
+  to  { opacity:1; transform:translateX(-50%) translateY(0)    scale(1); }
+}
+
+@media (prefers-reduced-motion: reduce){
+  #installBtn{ animation:none; }
+}
   /* ---------------- Floating emojis ---------------- */
 
   .floaters{
