@@ -1,0 +1,1373 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, maximum-scale=1, user-scalable=no, viewport-fit=cover">
+<meta name="theme-color" content="#0a0c18">
+<title>Emoji Sort Puzzle</title>
+<style>
+  *{box-sizing:border-box;-webkit-tap-highlight-color:transparent;}
+  html,body{margin:0;padding:0;width:100%;height:100%;overflow:hidden;overscroll-behavior:none;}
+  body{
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,"Helvetica Neue",Arial,sans-serif;
+    background:#0a0c18;color:#eef1ff;
+    user-select:none;-webkit-user-select:none;
+    touch-action:manipulation;
+  }
+  #app{
+    position:fixed;inset:0;
+    display:flex;flex-direction:column;
+    background:radial-gradient(120% 80% at 50% -10%, #2b3168 0%, #171b3a 45%, #0a0c18 100%);
+  }
+
+  /* ---------- HUD ---------- */
+  #hud{
+    flex:0 0 auto;
+    display:grid;
+    grid-template-columns: 1fr auto 1fr;
+    align-items:center;
+    gap:10px;
+    padding:calc(env(safe-area-inset-top,0px) + 10px) 16px 4px;
+  }
+  .hud-pill{
+    justify-self:center;
+    display:flex;align-items:baseline;gap:8px;
+    background:rgba(255,255,255,.07);
+    border:1px solid rgba(255,255,255,.10);
+    border-radius:999px;padding:6px 16px;
+  }
+  .hud-label{font-size:10px;letter-spacing:2px;color:#8ea0d8;font-weight:700;}
+  #levelNum{font-size:18px;font-weight:800;}
+
+  .hud-icon-btn{
+    justify-self:start;
+    width:42px;height:42px;
+    display:inline-flex;align-items:center;justify-content:center;
+    border-radius:14px;
+    border:1px solid rgba(255,255,255,.14);
+    background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
+    color:#dfe6ff;
+    text-decoration:none;cursor:pointer;
+    box-shadow:0 6px 18px rgba(0,0,0,.25), inset 0 1px 0 rgba(255,255,255,.10);
+    transition:transform .12s ease, background .2s ease, opacity .2s ease;
+    font:inherit;
+  }
+  .hud-icon-btn:active{transform:scale(.9);background:rgba(255,255,255,.16);}
+  .hud-icon-btn svg{display:block;}
+  .hud-icon-btn.is-waiting{opacity:.7;}
+
+  .skip-btn{
+    justify-self:end;
+    display:inline-flex;align-items:center;gap:6px;
+    padding:8px 14px;border-radius:999px;
+    border:1px solid rgba(255,255,255,.14);
+    background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
+    color:#dfe6ff;font-family:inherit;font-size:12px;font-weight:700;
+    letter-spacing:.3px;cursor:pointer;
+    transition:transform .12s ease, background .2s ease;
+  }
+  .skip-btn:active{transform:scale(.93);background:rgba(255,255,255,.16);}
+  .skip-btn .skip-icon{font-size:14px;line-height:1;}
+
+  /* ---------- Tubes ---------- */
+  #tubeArea{
+    flex:1 1 auto;min-height:0;
+    display:flex;align-items:center;justify-content:center;
+    padding:16px 6px;overflow:hidden;
+  }
+  #tubes{
+    --tw:52px;--th:195px;--slot:44px;--pad:4px;
+    display:flex;flex-wrap:wrap;
+    justify-content:center;align-content:center;
+    width:100%;
+  }
+  .tube{
+    position:relative;flex:0 0 auto;
+    width:var(--tw);height:var(--th);
+    border:2px solid rgba(160,190,255,.28);
+    border-top-color:rgba(160,190,255,.14);
+    border-radius:7px 7px 14px 14px;
+    background:linear-gradient(180deg, rgba(255,255,255,.055), rgba(255,255,255,.015));
+    box-shadow:inset 0 0 14px rgba(120,170,255,.08), 0 6px 14px rgba(0,0,0,.35);
+    transition:transform .16s ease, border-color .16s ease, box-shadow .16s ease;
+    cursor:pointer;
+  }
+  .tube.selected{
+    transform:translateY(-14px);
+    border-color:rgba(110,200,255,.9);
+    box-shadow:0 0 0 2px rgba(110,200,255,.22), 0 0 22px rgba(80,170,255,.45), 0 8px 18px rgba(0,0,0,.4);
+  }
+  /* Hint highlights */
+  .tube.hint-from{
+    transform:translateY(-10px);
+    border-color:rgba(255,205,70,.95);
+    box-shadow:0 0 0 2px rgba(255,205,70,.30), 0 0 26px rgba(255,190,50,.55);
+    animation:hintPulse .8s ease-in-out infinite alternate;
+  }
+  .tube.hint-to{
+    transform:translateY(-10px);
+    border-color:rgba(110,255,170,.95);
+    box-shadow:0 0 0 2px rgba(110,255,170,.30), 0 0 26px rgba(80,255,150,.55);
+    animation:hintPulse .8s ease-in-out infinite alternate;
+  }
+  @keyframes hintPulse{from{opacity:.72;}to{opacity:1;}}
+
+  .tube-inner{position:absolute;top:0;right:0;bottom:0;left:0;}
+  .tube-inner.shake{animation:shake .38s ease;}
+  @keyframes shake{
+    0%,100%{transform:translateX(0);}
+    18%{transform:translateX(-5px);}
+    36%{transform:translateX(5px);}
+    54%{transform:translateX(-3px);}
+    72%{transform:translateX(3px);}
+    88%{transform:translateX(-1px);}
+  }
+  .token{
+    position:absolute;left:0;right:0;
+    height:var(--slot);
+    bottom:calc(var(--pad) + var(--i) * var(--slot));
+    display:flex;align-items:center;justify-content:center;
+    font-size:calc(var(--slot) * .74);
+    line-height:1;
+    pointer-events:none;
+    will-change:transform;
+    backface-visibility:hidden;
+    text-shadow:0 2px 5px rgba(0,0,0,.45);
+  }
+
+  /* ---------- Power-ups ---------- */
+  #powerups{
+    flex:0 0 auto;
+    display:flex;justify-content:center;gap:8px;
+    padding:6px 10px calc(env(safe-area-inset-bottom,0px) + 12px);
+  }
+  .pu-btn{
+    position:relative;flex:1 1 0;max-width:100px;min-width:0;
+    display:flex;flex-direction:column;align-items:center;gap:3px;
+    padding:9px 4px 8px;border-radius:16px;
+    border:1px solid rgba(255,255,255,.13);
+    background:linear-gradient(180deg, rgba(255,255,255,.10), rgba(255,255,255,.03));
+    color:#dfe6ff;font-size:11px;font-weight:600;
+    font-family:inherit;cursor:pointer;
+    transition:transform .12s ease, background .2s ease, opacity .2s ease;
+  }
+  .pu-btn:active{transform:scale(.93);background:rgba(255,255,255,.15);}
+  .pu-icon{font-size:19px;line-height:1;}
+  .pu-label{white-space:nowrap;}
+  .pu-badge{
+    position:absolute;top:-6px;right:-5px;
+    min-width:20px;height:20px;padding:0 5px;
+    border-radius:999px;background:#4b7bff;color:#fff;
+    font-size:11px;font-weight:800;
+    display:flex;align-items:center;justify-content:center;
+    box-shadow:0 2px 6px rgba(0,0,0,.45);
+    transition:background .2s ease;
+  }
+  .pu-badge.zero{background:#3a4066;color:#98a2cc;font-size:10px;letter-spacing:.5px;}
+
+  /* ---------- Overlays ---------- */
+  .overlay{
+    position:fixed;inset:0;z-index:500;
+    display:flex;align-items:center;justify-content:center;
+    background:rgba(6,8,18,.85);
+  }
+  .overlay.hidden{display:none;}
+  #confetti{position:absolute;top:0;left:0;width:100%;height:100%;z-index:1;pointer-events:none;}
+  .win-card{
+    position:relative;z-index:2;
+    width:min(86vw,340px);
+    padding:28px 22px 24px;border-radius:26px;text-align:center;
+    background:linear-gradient(180deg,#252c59,#161a35);
+    border:1px solid rgba(140,170,255,.25);
+    box-shadow:0 24px 60px rgba(0,0,0,.65);
+    animation:pop .42s cubic-bezier(.2,1.4,.5,1);
+  }
+  @keyframes pop{from{transform:scale(.82);opacity:0;}to{transform:scale(1);opacity:1;}}
+  .win-emoji{font-size:46px;line-height:1;margin-bottom:6px;}
+  .win-card h2{margin:0 0 4px;font-size:23px;letter-spacing:.3px;}
+  .win-card p{margin:0 0 20px;color:#9aa6d6;font-size:14px;}
+  .win-card p span{color:#7fb2ff;font-weight:800;}
+  .primary-btn{
+    display:inline-flex;align-items:center;justify-content:center;
+    padding:13px 34px;border-radius:999px;border:0;
+    font-family:inherit;font-size:15px;font-weight:800;letter-spacing:.4px;
+    color:#fff;cursor:pointer;
+    background:linear-gradient(180deg,#5b8cff,#3a63e0);
+    box-shadow:0 8px 22px rgba(70,120,255,.45);
+    transition:transform .12s ease;
+  }
+  .primary-btn:active{transform:scale(.94);}
+
+  /* ---------- Ad interstitial ---------- */
+  .ad-overlay{
+    position:fixed;inset:0;z-index:9000;
+    background:#05060d;
+  }
+  .ad-overlay.hidden{display:none;}
+  #adFrame{
+    position:absolute;top:0;left:0;width:100%;height:100%;
+    border:0;z-index:1;background:#0b0e1c;
+  }
+  .ad-ui{
+    position:absolute;top:0;left:0;right:0;bottom:0;z-index:10;
+    display:flex;flex-direction:column;align-items:center;justify-content:flex-end;
+    padding-bottom:calc(env(safe-area-inset-bottom,0px) + 36px);
+    pointer-events:none;
+  }
+  .ad-timer{
+    pointer-events:auto;
+    width:66px;height:66px;border-radius:50%;
+    display:flex;align-items:center;justify-content:center;
+    font-size:26px;font-weight:800;color:#cfe0ff;
+    background:rgba(10,12,26,.85);
+    border:2px solid rgba(140,180,255,.5);
+    box-shadow:0 6px 22px rgba(0,0,0,.55);
+  }
+  .ad-timer.hidden{display:none;}
+  #adContinue{
+    pointer-events:auto;
+    z-index:999999;
+    animation:pop .3s ease;
+  }
+  #adContinue.hidden{display:none;}
+
+  @media (prefers-reduced-motion: reduce){
+    *{animation-duration:.01ms !important;transition-duration:.01ms !important;}
+  }
+</style>
+</head>
+<body>
+
+<div id="app">
+  <header id="hud">
+    <a id="backBtn" class="hud-icon-btn" href="levels.html" aria-label="Back to levels">
+      <svg viewBox="0 0 24 24" width="18" height="18" fill="none"
+           stroke="currentColor" stroke-width="2.4"
+           stroke-linecap="round" stroke-linejoin="round" aria-hidden="true">
+        <path d="M15 5l-7 7 7 7"/>
+      </svg>
+    </a>
+
+    <div class="hud-pill">
+      <span class="hud-label">LEVEL</span>
+      <span id="levelNum">1</span>
+    </div>
+
+    <button id="skipBtn" class="skip-btn">
+      <span class="skip-icon">⏭</span><span>Skip Level</span>
+    </button>
+  </header>
+
+  <main id="tubeArea"><div id="tubes"></div></main>
+
+  <footer id="powerups">
+    <button class="pu-btn" data-p="shuffle">
+      <span class="pu-icon">🔀</span><span class="pu-label">Shuffle</span>
+      <span class="pu-badge" data-badge="shuffle">1</span>
+    </button>
+    <button class="pu-btn" data-p="undo">
+      <span class="pu-icon">↩️</span><span class="pu-label">Undo</span>
+      <span class="pu-badge" data-badge="undo">1</span>
+    </button>
+    <button class="pu-btn" data-p="hint">
+      <span class="pu-icon">💡</span><span class="pu-label">Hint</span>
+      <span class="pu-badge" data-badge="hint">1</span>
+    </button>
+    <button class="pu-btn" data-p="extra">
+      <span class="pu-icon">➕</span><span class="pu-label">Tube</span>
+      <span class="pu-badge" data-badge="extra">1</span>
+    </button>
+  </footer>
+</div>
+
+<div id="winOverlay" class="overlay hidden">
+  <canvas id="confetti"></canvas>
+  <div class="win-card">
+    <div class="win-emoji">🎉</div>
+    <h2>Level Complete</h2>
+    <p>You cleared level <span id="winLevel">1</span></p>
+    <button id="nextBtn" class="primary-btn">Next Level</button>
+  </div>
+</div>
+
+<div id="adOverlay" class="ad-overlay hidden">
+  <iframe id="adFrame" title="Advertisement"></iframe>
+  <div class="ad-ui">
+    <div id="adTimer" class="ad-timer">12</div>
+    <button id="adContinue" class="primary-btn hidden">Continue</button>
+  </div>
+</div>
+
+<script>
+(function () {
+'use strict';
+
+/* =====================================================================
+   CONFIG
+   ===================================================================== */
+const CAP = 4;
+const STORAGE_KEY = 'emojiSort.level.v1';
+const MAX_HISTORY = 80;
+const AD_SECONDS = 12;
+const AD_URL = 'https://gameoverinterstitial.blogspot.com/';
+
+/* Emoji type bounds — number of distinct emoji per level. */
+const MIN_TYPES = 4;
+const MAX_TYPES = 8;
+
+/* Absolute cap on the number of tubes on screen. */
+const MAX_TUBES = 15;
+
+/* How long the hint highlight stays on screen (ms). */
+const HINT_MS = 2200;
+
+/* Single emoji theme — every level draws from this one pool. */
+const EMOJI_THEME = [
+   '🎄','🎅','🤶','🦌','⛄',
+  '❄️','🎁','🔔','🕯️',
+  '🍪','🥛','🧦','⭐','🛷'
+];
+
+/* =====================================================================
+   SOUND
+   =====================================================================
+   Files live next to this HTML inside a `sounds/` folder. Rename
+   the source strings here if you use different file names.
+   ===================================================================== */
+const SOUND_SRC = {
+  click:   'sounds/buttonclick.mp3', // back button
+  tap:     'sounds/tubeclick.mp3',   // tube selected / deselected
+  drop:    'sounds/emojifly.mp3',    // emoji poured into a tube
+  wrong:   'sounds/wrongtube.mp3',   // illegal move
+  victory: 'sounds/victory.mp3',     // win overlay
+  skip:    'sounds/skip.mp3',        // "Skip Level" button
+  shuffle: 'sounds/shuffle.mp3',     // power-up: Shuffle
+  undo:    'sounds/undo.mp3',        // power-up: Undo
+  hint:    'sounds/hint.mp3',        // power-up: Hint
+  extra:   'sounds/extratube.mp3',   // power-up: Extra Tube
+  powerup: 'sounds/powerup.mp3'      // generic fallback for any power-up
+};
+
+/* Which clip each power-up plays. */
+const POWERUP_SFX = {
+  shuffle: 'shuffle',
+  undo:    'undo',
+  hint:    'hint',
+  extra:   'extra'
+};
+
+/* If a dedicated clip is missing, fall back to this one instead. */
+const SFX_FALLBACK = {
+  skip:    'click',
+  shuffle: 'powerup',
+  undo:    'powerup',
+  hint:    'powerup',
+  extra:   'powerup'
+};
+
+const audio = {};
+const audioFailed = Object.create(null);
+
+(function preloadSounds(){
+  const keys = Object.keys(SOUND_SRC);
+  for (let i = 0; i < keys.length; i++){
+    const k = keys[i];
+    const a = new Audio();
+    a.preload = 'auto';
+    a.volume  = 0.7;
+    // Track failed loads so resolveSfx() can pick a usable fallback.
+    a.addEventListener('error', function (){ audioFailed[k] = true; });
+    a.src = SOUND_SRC[k];
+    try { a.load(); } catch (e) {}
+    audio[k] = a;
+  }
+})();
+
+/* Pick the clip we should actually play for a given sound name. */
+function resolveSfx(name){
+  if (audio[name] && !audioFailed[name]) return name;
+  const fb = SFX_FALLBACK[name];
+  if (fb && audio[fb] && !audioFailed[fb]) return fb;
+  return name;
+}
+
+/* ---------- Play immediately (fire-and-forget) ---------- */
+function playSfx(name){
+  const a = audio[resolveSfx(name)];
+  if (!a) return;
+  try {
+    a.pause();
+    a.currentTime = 0;      // rewind so rapid taps replay
+  } catch (e) { /* ignore */ }
+  try {
+    const p = a.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(function () { /* autoplay blocked — ignore */ });
+    }
+  } catch (e) { /* ignore */ }
+}
+
+/* ---------- Play, then run a callback when it finishes ---------- */
+function playSfxThen(name, onDone){
+  const a = audio[resolveSfx(name)];
+  if (!a) { if (typeof onDone === 'function') onDone(); return; }
+
+  let settled = false;
+  const guard = window.setTimeout(function () {
+    if (settled) return;
+    settled = true;
+    if (typeof onDone === 'function') onDone();
+  }, 1500);
+
+  function settle(){
+    if (settled) return;
+    settled = true;
+    window.clearTimeout(guard);
+    if (typeof onDone === 'function') onDone();
+  }
+
+  const onEnded = function () {
+    a.removeEventListener('ended', onEnded);
+    // Tiny tail so the last sample isn't clipped.
+    window.setTimeout(settle, 60);
+  };
+  a.addEventListener('ended', onEnded);
+
+  try {
+    a.pause();
+    a.currentTime = 0;
+  } catch (e) { /* ignore */ }
+
+  try {
+    const p = a.play();
+    if (p && typeof p.catch === 'function') {
+      p.catch(function () {
+        a.removeEventListener('ended', onEnded);
+        settle();
+      });
+    }
+  } catch (e) {
+    a.removeEventListener('ended', onEnded);
+    settle();
+  }
+}
+
+/* ---------- iOS/Android audio unlock ----------
+   Mobile browsers block audio until the first user gesture.
+   Play each clip once at volume 0 to warm them up.            */
+let audioUnlocked = false;
+function unlockAudio(){
+  if (audioUnlocked) return;
+  audioUnlocked = true;
+  const keys = Object.keys(audio);
+  for (let i = 0; i < keys.length; i++){
+    const a = audio[keys[i]];
+    try {
+      const prev = a.volume;
+      a.volume = 0;
+      const p = a.play();
+      if (p && typeof p.then === 'function') {
+        p.then(function () {
+          try { a.pause(); a.currentTime = 0; a.volume = prev; } catch (e) {}
+        }).catch(function () {
+          try { a.volume = prev; } catch (e) {}
+        });
+      } else {
+        try { a.pause(); a.currentTime = 0; a.volume = prev; } catch (e) {}
+      }
+    } catch (e) {}
+  }
+}
+document.addEventListener('touchstart', unlockAudio, { once:true, passive:true });
+document.addEventListener('mousedown',  unlockAudio, { once:true });
+
+/* =====================================================================
+   DOM
+   ===================================================================== */
+const tubesEl     = document.getElementById('tubes');
+const tubeArea    = document.getElementById('tubeArea');
+const levelNumEl  = document.getElementById('levelNum');
+const winOverlay  = document.getElementById('winOverlay');
+const winLevelEl  = document.getElementById('winLevel');
+const nextBtn     = document.getElementById('nextBtn');
+const skipBtn     = document.getElementById('skipBtn');
+const backBtn     = document.getElementById('backBtn');
+const adOverlay   = document.getElementById('adOverlay');
+const adFrame     = document.getElementById('adFrame');
+const adTimerEl   = document.getElementById('adTimer');
+const adContinue  = document.getElementById('adContinue');
+
+/* =====================================================================
+   STATE
+   ===================================================================== */
+let level = 1;
+let tubes = [];              // Array<Array<{id,emoji}>>
+let currentEmojis = [];      // emoji strings for this level
+let tubeEls = [];
+let innerEls = [];
+let tokenEls = new Map();    // token id -> element
+let tokenSeq = 0;
+let selected = -1;
+let history = [];
+let busy = false;
+let powerups = null;
+let adCallback = null;
+let adInterval = null;
+let confettiRAF = null;
+let hintTimer = null;
+let leaving = false;         // guards against double navigation
+
+/* =====================================================================
+   UTILITIES
+   ===================================================================== */
+function randInt(n){ return (Math.random() * n) | 0; }
+
+function pickN(arr, n){
+  const out = [];
+  const used = new Set();
+  n = Math.min(n, arr.length);
+  while (out.length < n){
+    const i = randInt(arr.length);
+    if (used.has(i)) continue;
+    used.add(i);
+    out.push(arr[i]);
+  }
+  return out;
+}
+
+/* =====================================================================
+   LEVEL DIFFICULTY
+   ---------------------------------------------------------------------
+   • Emoji types:   random integer between MIN_TYPES (4) and MAX_TYPES (8)
+   • Empty tubes:   random 1 or 2
+   ---------------------------------------------------------------------
+   NOTE: 0 empty tubes is not playable. With CAP = 4 and every emoji used
+   exactly 4 times, 0 empty tubes means every tube is full, so no move is
+   ever legal. The floor therefore stays at 1.
+   ===================================================================== */
+function levelConfig(){
+  const types = MIN_TYPES + randInt(MAX_TYPES - MIN_TYPES + 1); // 4..8
+  const empty = 1 + randInt(2);                                 // 1..2
+  return { types: types, empty: empty, total: types + empty };
+}
+
+/* =====================================================================
+   PUZZLE GENERATOR — reverse-walk from a solved state.
+   ===================================================================== */
+
+function reverseStep(t){
+  const n = t.length;
+
+  let b = -1, maxK = 0, e = 0, count = 0;
+  for (let i = 0; i < n; i++){
+    const T = t[i];
+    const len = T.length;
+    if (len === 0) continue;
+
+    const top = T[len - 1];
+    let r = 1;
+    while (r < len && T[len - 1 - r] === top) r++;
+
+    let mk = r;
+    if (len > r) mk = r - 1;
+    if (mk < 1) continue;
+
+    count++;
+    if (Math.random() < 1 / count){ b = i; maxK = mk; e = top; }
+  }
+  if (b < 0) return false;
+
+  const k = 1 + randInt(maxK);
+
+  let a = -1, dc = 0;
+  for (let i = 0; i < n; i++){
+    if (i === b) continue;
+    const A = t[i];
+    if (A.length + k > CAP) continue;
+    if (A.length > 0 && A[A.length - 1] === e) continue;
+    dc++;
+    if (Math.random() < 1 / dc) a = i;
+  }
+  if (a < 0) return false;
+
+  const B = t[b], A = t[a];
+  for (let x = 0; x < k; x++){ B.pop(); A.push(e); }
+  return true;
+}
+
+function mixScore(t){
+  let total = 0, mixed = 0;
+  for (let i = 0; i < t.length; i++){
+    const col = t[i];
+    const len = col.length;
+    if (len === 0) continue;
+    total += len;
+    const first = col[0];
+    let uniform = true;
+    for (let j = 1; j < len; j++){
+      if (col[j] !== first){ uniform = false; break; }
+    }
+    if (!uniform) mixed += len;
+  }
+  return total ? mixed / total : 0;
+}
+
+function generateSolvable(typeCount, totalTubes){
+  const target = 2200 + Math.min(totalTubes, 20) * 160;
+  let best = null, bestScore = -1;
+
+  for (let attempt = 0; attempt < 4; attempt++){
+    const t = [];
+    for (let i = 0; i < typeCount; i++) t.push([i, i, i, i]);
+    while (t.length < totalTubes) t.push([]);
+
+    let steps = 0;
+    while (steps < target){
+      for (let s = 0; s < 250; s++) reverseStep(t);
+      steps += 250;
+      if (steps >= 900 && mixScore(t) >= 0.62) break;
+    }
+
+    const sc = mixScore(t);
+    if (sc > bestScore){ bestScore = sc; best = t; }
+    if (sc >= 0.62) break;
+  }
+
+  best.sort(function (x, y){ return (x.length ? 0 : 1) - (y.length ? 0 : 1); });
+  return best;
+}
+
+/* =====================================================================
+   BOARD CONSTRUCTION
+   ===================================================================== */
+function createTubeEl(){
+  const tube = document.createElement('div');
+  tube.className = 'tube';
+  tube.dataset.i = tubeEls.length;
+  const inner = document.createElement('div');
+  inner.className = 'tube-inner';
+  tube.appendChild(inner);
+  tubesEl.appendChild(tube);
+  tubeEls.push(tube);
+  innerEls.push(inner);
+}
+
+function ensureTubeCount(n){
+  while (tubeEls.length > n){
+    const el = tubeEls.pop();
+    el.remove();
+    innerEls.pop();
+  }
+  while (tubeEls.length < n) createTubeEl();
+}
+
+function buildLevel(state, emojis){
+  tokenEls.clear();
+  tokenSeq = 0;
+
+  tubes = state.map(function (col){
+    return col.map(function (ei){
+      return { id: tokenSeq++, emoji: emojis[ei] };
+    });
+  });
+
+  tubesEl.textContent = '';
+  tubeEls = [];
+  innerEls = [];
+  for (let i = 0; i < tubes.length; i++) createTubeEl();
+
+  for (let i = 0; i < tubes.length; i++){
+    const inner = innerEls[i];
+    const col = tubes[i];
+    for (let j = 0; j < col.length; j++){
+      const tk = col[j];
+      const el = document.createElement('div');
+      el.className = 'token';
+      el.textContent = tk.emoji;
+      el.style.setProperty('--i', j);
+      tokenEls.set(tk.id, el);
+      inner.appendChild(el);
+    }
+  }
+
+  layout();
+}
+
+function rebuildTokens(){
+  for (let i = 0; i < tubes.length; i++){
+    const inner = innerEls[i];
+    const col = tubes[i];
+    for (let j = 0; j < col.length; j++){
+      const el = tokenEls.get(col[j].id);
+      if (!el) continue;
+      el.style.setProperty('--i', j);
+      inner.appendChild(el);
+    }
+  }
+}
+
+function setPositions(i){
+  const col = tubes[i];
+  for (let j = 0; j < col.length; j++){
+    const el = tokenEls.get(col[j].id);
+    if (el) el.style.setProperty('--i', j);
+  }
+}
+
+/* =====================================================================
+   LAYOUT
+   ===================================================================== */
+function layout(){
+  const n = tubes.length;
+  if (!n) return;
+
+  const areaW = tubeArea.clientWidth;
+  const areaH = tubeArea.clientHeight;
+  const gapX = n > 8 ? 7 : 10;
+  const gapY = 14;
+
+  let bestW = 0;
+  for (let rows = 1; rows <= 5; rows++){
+    const perRow = Math.ceil(n / rows);
+    const wByWidth  = (areaW - 16 - (perRow - 1) * gapX) / perRow;
+    const hByHeight = (areaH - 16 - (rows - 1) * gapY) / rows;
+    const w = Math.min(wByWidth, hByHeight / 3.75);
+    const score = w / (1 + (rows - 1) * 0.08);
+    if (score > bestW) bestW = score;
+  }
+
+  bestW = Math.max(24, Math.min(bestW, 76));
+  const tw = Math.round(bestW);
+  const th = Math.round(tw * 3.75);
+  const innerH = th - 4;
+  const pad = Math.max(2, Math.round(innerH * 0.04));
+  const slot = (innerH - pad * 2) / 4;
+
+  tubesEl.style.setProperty('--tw', tw + 'px');
+  tubesEl.style.setProperty('--th', th + 'px');
+  tubesEl.style.setProperty('--slot', slot + 'px');
+  tubesEl.style.setProperty('--pad', pad + 'px');
+  tubesEl.style.gap = gapY + 'px ' + gapX + 'px';
+}
+
+/* =====================================================================
+   GAME FLOW
+   ===================================================================== */
+function startLevel(lvl){
+  level = lvl;
+  try { localStorage.setItem(STORAGE_KEY, String(lvl)); } catch (e) {}
+
+  levelNumEl.textContent = String(lvl);
+  winOverlay.classList.add('hidden');
+  stopConfetti();
+  clearHint();
+
+  const cfg = levelConfig();
+  currentEmojis = pickN(EMOJI_THEME, cfg.types);
+
+  const state = generateSolvable(cfg.types, cfg.total);
+  buildLevel(state, currentEmojis);
+
+  history = [];
+  selected = -1;
+  busy = false;
+  powerups = {
+    shuffle: { free: 1, count: 0 },
+    undo:    { free: 1, count: 0 },
+    hint:    { free: 1, count: 0 },
+    extra:   { free: 1, count: 0 }
+  };
+  updatePowerupUI();
+}
+
+function updatePowerupUI(){
+  const keys = ['shuffle', 'undo', 'hint', 'extra'];
+  for (let i = 0; i < keys.length; i++){
+    const k = keys[i];
+    const pu = powerups[k];
+    const badge = document.querySelector('[data-badge="' + k + '"]');
+    if (!badge) continue;
+    const total = pu.free + pu.count;
+    if (total > 0){
+      badge.textContent = String(total);
+      badge.classList.remove('zero');
+    } else {
+      badge.textContent = 'AD';
+      badge.classList.add('zero');
+    }
+  }
+}
+
+/* ---------------- Interaction ---------------- */
+
+tubesEl.addEventListener('click', function (e){
+  if (busy) return;
+  const tube = e.target.closest ? e.target.closest('.tube') : null;
+  if (!tube) return;
+  onTubeTap(parseInt(tube.dataset.i, 10));
+});
+
+function onTubeTap(i){
+  if (busy) return;
+  if (isNaN(i) || !tubes[i]) return;
+
+  // ---- First tap: pick a source ----
+  if (selected === -1){
+    if (tubes[i].length === 0) return;    // empty tube → nothing to select
+    selected = i;
+    tubeEls[i].classList.add('selected');
+    playSfx('tap');
+    return;
+  }
+
+  // ---- Tapping the same tube again: deselect ----
+  if (selected === i){
+    tubeEls[i].classList.remove('selected');
+    selected = -1;
+    playSfx('tap');
+    return;
+  }
+
+  // ---- Second tap: attempt a move ----
+  const from = selected;
+  const to = i;
+  const src = tubes[from];
+  const dst = tubes[to];
+
+  if (src.length === 0){
+    tubeEls[from].classList.remove('selected');
+    selected = -1;
+    playSfx('tap');
+    return;
+  }
+
+  const topEmoji = src[src.length - 1].emoji;
+  const canPlace = dst.length < CAP &&
+                   (dst.length === 0 || dst[dst.length - 1].emoji === topEmoji);
+
+  // ---- Illegal target: shake + wrong sound ----
+  if (!canPlace){
+    shakeTube(from);
+    shakeTube(to);
+    playSfx('wrong');
+    return;
+  }
+
+  let run = 1;
+  while (run < src.length && src[src.length - 1 - run].emoji === topEmoji) run++;
+
+  const space = CAP - dst.length;
+  const count = Math.min(run, space);
+
+  tubeEls[from].classList.remove('selected');
+  selected = -1;
+
+  // ---- Legal move: pour sound ----
+  playSfx('drop');
+  performMove(from, to, count);
+}
+
+function shakeTube(i){
+  const inner = innerEls[i];
+  if (!inner) return;
+  inner.classList.remove('shake');
+  void inner.offsetWidth;
+  inner.classList.add('shake');
+  window.setTimeout(function (){ inner.classList.remove('shake'); }, 400);
+}
+
+/* ---------------- Move execution (FLIP animation) ---------------- */
+
+function pushHistory(){
+  history.push(tubes.map(function (col){ return col.slice(); }));
+  if (history.length > MAX_HISTORY) history.shift();
+}
+
+function performMove(from, to, count){
+  busy = true;
+  pushHistory();
+  clearHint();
+
+  const src = tubes[from];
+  const dst = tubes[to];
+  const moving = src.slice(src.length - count);
+
+  const beforeRects = moving.map(function (tk){
+    return tokenEls.get(tk.id).getBoundingClientRect();
+  });
+
+  src.length -= count;
+  for (let i = 0; i < moving.length; i++) dst.push(moving[i]);
+
+  for (let i = 0; i < moving.length; i++){
+    innerEls[to].appendChild(tokenEls.get(moving[i].id));
+  }
+  setPositions(from);
+  setPositions(to);
+
+  const afterRects = moving.map(function (tk){
+    return tokenEls.get(tk.id).getBoundingClientRect();
+  });
+
+  const displaced = [];
+  for (let i = 0; i < moving.length; i++){
+    const el = tokenEls.get(moving[i].id);
+    const dx = beforeRects[i].left - afterRects[i].left;
+    const dy = beforeRects[i].top - afterRects[i].top;
+    if (dx === 0 && dy === 0) continue;
+    el.style.transition = 'none';
+    el.style.transform = 'translate(' + dx + 'px,' + dy + 'px)';
+    displaced.push(el);
+  }
+
+  if (displaced.length === 0){
+    busy = false;
+    checkWin();
+    return;
+  }
+
+  void tubesEl.offsetWidth;
+
+  requestAnimationFrame(function (){
+    for (let i = 0; i < displaced.length; i++){
+      const el = displaced[i];
+      el.style.transition = 'transform .24s cubic-bezier(.34,1.15,.64,1)';
+      el.style.transform = 'translate(0,0)';
+    }
+
+    window.setTimeout(function (){
+      for (let i = 0; i < displaced.length; i++){
+        displaced[i].style.transition = '';
+        displaced[i].style.transform = '';
+      }
+      busy = false;
+      checkWin();
+    }, 250);
+  });
+}
+
+/* ---------------- Win detection ---------------- */
+
+function isSolved(){
+  for (let i = 0; i < tubes.length; i++){
+    const col = tubes[i];
+    if (col.length === 0) continue;
+    if (col.length !== CAP) return false;
+    const e = col[0].emoji;
+    for (let j = 1; j < col.length; j++){
+      if (col[j].emoji !== e) return false;
+    }
+  }
+  return true;
+}
+
+function checkWin(){
+  if (!isSolved()) return;
+  window.setTimeout(function (){
+    winLevelEl.textContent = String(level);
+    winOverlay.classList.remove('hidden');
+    startConfetti();
+    playSfx('victory');       // victory screen sound
+  }, 230);
+}
+
+/* =====================================================================
+   HINT — find the best available move and highlight it briefly.
+   ===================================================================== */
+function findHint(){
+  const n = tubes.length;
+  let best = null;
+
+  for (let i = 0; i < n; i++){
+    const src = tubes[i];
+    if (src.length === 0) continue;
+
+    const topEmoji = src[src.length - 1].emoji;
+    let run = 1;
+    while (run < src.length && src[src.length - 1 - run].emoji === topEmoji) run++;
+
+    // Is the source already a finished (uniform, full) tube?
+    const srcUniformFull = (run === src.length && run === CAP);
+
+    for (let j = 0; j < n; j++){
+      if (i === j) continue;
+      const dst = tubes[j];
+      if (dst.length >= CAP) continue;
+      if (dst.length > 0 && dst[dst.length - 1].emoji !== topEmoji) continue;
+
+      // Pointless: moving a whole uniform tube into an empty tube.
+      if (dst.length === 0 && run === src.length) continue;
+
+      const space = CAP - dst.length;
+      const count = Math.min(run, space);
+
+      let score = count;
+      if (dst.length > 0) score += 10 * count;                          // consolidating
+      if (dst.length + count === CAP &&
+          (dst.length === 0 || dst[0].emoji === topEmoji)) score += 100; // completes a tube
+      if (count === src.length) score += 5;                              // empties source
+      if (dst.length === 0) score -= 4;                                  // prefer non-empty dst
+      if (srcUniformFull) score -= 50;                                   // never bother moving a solved tube
+
+      if (!best || score > best.score){
+        best = { from: i, to: j, score: score };
+      }
+    }
+  }
+  return best;
+}
+
+function clearHint(){
+  if (hintTimer){ clearTimeout(hintTimer); hintTimer = null; }
+  for (let i = 0; i < tubeEls.length; i++){
+    tubeEls[i].classList.remove('hint-from');
+    tubeEls[i].classList.remove('hint-to');
+  }
+}
+
+function showHint(){
+  clearHint();
+  const h = findHint();
+  if (!h){
+    flashButton('hint');
+    return;
+  }
+  tubeEls[h.from].classList.add('hint-from');
+  tubeEls[h.to].classList.add('hint-to');
+  hintTimer = window.setTimeout(function (){
+    hintTimer = null;
+    for (let i = 0; i < tubeEls.length; i++){
+      tubeEls[i].classList.remove('hint-from');
+      tubeEls[i].classList.remove('hint-to');
+    }
+  }, HINT_MS);
+}
+
+/* =====================================================================
+   POWER-UPS
+   ---------------------------------------------------------------------
+   Each power-up starts with 1 FREE charge (no ad).
+   Once free charges are gone, the next tap shows a rewarded interstitial;
+   when the ad completes, the power-up is applied.
+   ===================================================================== */
+
+function usePowerup(type){
+  if (busy) return;
+  const pu = powerups[type];
+  if (!pu) return;
+
+  // Sanity checks so we don't consume a charge / show an ad for a no-op.
+  if (type === 'undo' && history.length === 0){
+    flashButton(type);
+    return;
+  }
+  if (type === 'extra' && tubes.length >= MAX_TUBES){
+    flashButton(type);
+    return;
+  }
+  if (type === 'hint' && !findHint()){
+    flashButton(type);
+    return;
+  }
+
+  // FREE charge available -> apply immediately, no ad.
+  if (pu.free > 0){
+    pu.free--;
+    applyPowerup(type);
+    updatePowerupUI();
+    return;
+  }
+
+  // Rewarded credit available -> apply immediately, no ad.
+  if (pu.count > 0){
+    pu.count--;
+    applyPowerup(type);
+    updatePowerupUI();
+    return;
+  }
+
+  // No charges -> show the rewarded ad, then apply the power-up.
+  showInterstitial(function (){
+    applyPowerup(type);
+    updatePowerupUI();
+  });
+}
+
+function applyPowerup(type){
+  /* Sound fires HERE, at the exact moment the power-up takes effect:
+       • Free / credit charge → applied instantly, so the sound plays
+         instantly on tap.
+       • Ad required          → applied from the interstitial callback, so
+         the sound plays right after "Continue" is tapped.            */
+  playSfx(POWERUP_SFX[type] || 'powerup');
+
+  if (type === 'shuffle') doShuffle();
+  else if (type === 'undo') doUndo();
+  else if (type === 'hint') showHint();
+  else if (type === 'extra') doExtraTube();
+}
+
+function flashButton(type){
+  const btn = document.querySelector('.pu-btn[data-p="' + type + '"]');
+  if (!btn) return;
+  btn.style.transform = 'scale(.9)';
+  window.setTimeout(function (){ btn.style.transform = ''; }, 130);
+}
+
+/* ---------------- Shuffle ---------------- */
+function doShuffle(){
+  const total = tubes.length;
+  const state = generateSolvable(currentEmojis.length, total);
+
+  const buckets = new Map();
+  for (let i = 0; i < tubes.length; i++){
+    const col = tubes[i];
+    for (let j = 0; j < col.length; j++){
+      const tk = col[j];
+      let arr = buckets.get(tk.emoji);
+      if (!arr){ arr = []; buckets.set(tk.emoji, arr); }
+      arr.push(tk);
+    }
+  }
+
+  tubes = state.map(function (col){
+    return col.map(function (ei){
+      return buckets.get(currentEmojis[ei]).pop();
+    });
+  });
+
+  ensureTubeCount(tubes.length);
+  rebuildTokens();
+  layout();
+
+  history = [];
+  selected = -1;
+  clearHint();
+  for (let i = 0; i < tubeEls.length; i++) tubeEls[i].classList.remove('selected');
+}
+
+/* ---------------- Undo ---------------- */
+function doUndo(){
+  if (history.length === 0) return;
+  const snap = history.pop();
+
+  ensureTubeCount(snap.length);
+  tubes = snap.map(function (col){ return col.slice(); });
+  rebuildTokens();
+  layout();
+
+  selected = -1;
+  clearHint();
+  for (let i = 0; i < tubeEls.length; i++) tubeEls[i].classList.remove('selected');
+}
+
+/* ---------------- Extra tube ---------------- */
+function doExtraTube(){
+  if (tubes.length >= MAX_TUBES) return;
+  tubes.push([]);
+  createTubeEl();
+
+  for (let i = 0; i < history.length; i++) history[i].push([]);
+
+  layout();
+}
+
+/* =====================================================================
+   INTERSTITIAL — full-screen 12s ad (example.com)
+   ===================================================================== */
+
+function showInterstitial(onComplete){
+  adCallback = onComplete;
+
+  adOverlay.classList.remove('hidden');
+  adFrame.src = AD_URL;
+
+  adContinue.classList.add('hidden');
+  adTimerEl.classList.remove('hidden');
+
+  let remaining = AD_SECONDS;
+  adTimerEl.textContent = String(remaining);
+
+  if (adInterval) clearInterval(adInterval);
+  adInterval = setInterval(function (){
+    remaining--;
+    if (remaining > 0){
+      adTimerEl.textContent = String(remaining);
+      return;
+    }
+    clearInterval(adInterval);
+    adInterval = null;
+    adTimerEl.classList.add('hidden');
+    adContinue.classList.remove('hidden');
+  }, 1000);
+}
+
+function closeInterstitial(grant){
+  if (adInterval){ clearInterval(adInterval); adInterval = null; }
+  adOverlay.classList.add('hidden');
+  adContinue.classList.add('hidden');
+  adTimerEl.classList.remove('hidden');
+  adFrame.src = 'about:blank';
+
+  const cb = adCallback;
+  adCallback = null;
+  if (grant && cb) cb();
+}
+
+adContinue.addEventListener('click', function (){ closeInterstitial(true); });
+
+/* =====================================================================
+   CONFETTI
+   ===================================================================== */
+function startConfetti(){
+  const cvs = document.getElementById('confetti');
+  const ctx = cvs.getContext('2d');
+  const dpr = Math.min(window.devicePixelRatio || 1, 2);
+  const w = cvs.clientWidth || window.innerWidth;
+  const h = cvs.clientHeight || window.innerHeight;
+
+  cvs.width  = Math.floor(w * dpr);
+  cvs.height = Math.floor(h * dpr);
+  ctx.setTransform(dpr, 0, 0, dpr, 0, 0);
+
+  const colors = ['#ff6b8b','#ffd166','#5b8cff','#5ce1a4','#c07bff','#ff9f45'];
+  const parts = [];
+  for (let i = 0; i < 80; i++){
+    parts.push({
+      x: Math.random() * w,
+      y: -20 - Math.random() * h * 0.7,
+      vx: (Math.random() - 0.5) * 1.5,
+      vy: 2 + Math.random() * 3,
+      s: 4 + Math.random() * 6,
+      r: Math.random() * Math.PI,
+      vr: (Math.random() - 0.5) * 0.22,
+      c: colors[randInt(colors.length)]
+    });
+  }
+
+  let last = performance.now();
+
+  function frame(now){
+    const dt = Math.min(now - last, 50);
+    last = now;
+
+    ctx.clearRect(0, 0, w, h);
+    let alive = false;
+
+    for (let i = 0; i < parts.length; i++){
+      const p = parts[i];
+      p.x += p.vx * dt / 16;
+      p.y += p.vy * dt / 16;
+      p.vy += 0.03 * dt / 16;
+      p.r += p.vr * dt / 16;
+
+      if (p.y < h + 30) alive = true;
+
+      ctx.save();
+      ctx.translate(p.x, p.y);
+      ctx.rotate(p.r);
+      ctx.fillStyle = p.c;
+      ctx.fillRect(-p.s / 2, -p.s / 2, p.s, p.s * 0.6);
+      ctx.restore();
+    }
+
+    if (alive && !winOverlay.classList.contains('hidden')){
+      confettiRAF = requestAnimationFrame(frame);
+    } else {
+      confettiRAF = null;
+      ctx.clearRect(0, 0, w, h);
+    }
+  }
+
+  stopConfetti();
+  confettiRAF = requestAnimationFrame(frame);
+}
+
+function stopConfetti(){
+  if (confettiRAF){
+    cancelAnimationFrame(confettiRAF);
+    confettiRAF = null;
+  }
+}
+
+/* =====================================================================
+   EVENT WIRING
+   ===================================================================== */
+
+/* ---------- Back button: play sound, then navigate ---------- */
+backBtn.addEventListener('click', function (e){
+  e.preventDefault();
+  if (leaving) return;
+  leaving = true;
+
+  backBtn.classList.add('is-waiting');
+
+  const href = backBtn.getAttribute('href') || 'levels.html';
+  playSfxThen('click', function (){
+    window.location.href = href;
+  });
+});
+
+nextBtn.addEventListener('click', function (){
+  winOverlay.classList.add('hidden');
+  stopConfetti();
+
+  const next = level + 1;
+
+  if (level % 5 === 0){
+    showInterstitial(function (){ startLevel(next); });
+  } else {
+    startLevel(next);
+  }
+});
+
+/* ---------- Skip Level: sound fires on tap, then the ad ---------- */
+skipBtn.addEventListener('click', function (){
+  if (busy) return;
+  playSfx('skip');
+  showInterstitial(function (){ startLevel(level + 1); });
+});
+
+const puButtons = document.querySelectorAll('.pu-btn');
+for (let i = 0; i < puButtons.length; i++){
+  (function (btn){
+    btn.addEventListener('click', function (){
+      usePowerup(btn.dataset.p);
+    });
+  })(puButtons[i]);
+}
+
+let resizeTimer = null;
+function onResize(){
+  if (resizeTimer) clearTimeout(resizeTimer);
+  resizeTimer = window.setTimeout(function (){
+    layout();
+    resizeTimer = null;
+  }, 120);
+}
+window.addEventListener('resize', onResize);
+window.addEventListener('orientationchange', onResize);
+
+/* =====================================================================
+   BOOT
+   ===================================================================== */
+function boot(){
+  let saved = 1;
+  try {
+    const raw = localStorage.getItem(STORAGE_KEY);
+    const parsed = parseInt(raw, 10);
+    if (!isNaN(parsed) && parsed > 0) saved = parsed;
+  } catch (e) {}
+  startLevel(saved);
+}
+
+if (document.readyState === 'loading'){
+  document.addEventListener('DOMContentLoaded', boot);
+} else {
+  boot();
+}
+
+})();
+</script>
+</body>
+</html>
